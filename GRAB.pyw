@@ -10,7 +10,11 @@ import subprocess
 import json
 import re
 import os
+import glob
 import random
+
+import librosa
+import numpy as np
 
 # ── Config ──────────────────────────────────────────────
 DEFAULT_DIR = r"M:\Youtube Beats\March Beats"
@@ -398,6 +402,23 @@ class GrabApp:
             self._log(f"\n[OK] DOWNLOAD COMPLETE", "green")
             self._log(f"[OK] {final_name}.mp3", "bright")
             self._log(f"[OK] Saved to: {save_path}", "dim")
+
+            # BPM Scan
+            mp3_path = os.path.join(save_path, final_name + ".mp3")
+            if not os.path.exists(mp3_path):
+                # yt-dlp sometimes tweaks the name, find it
+                matches = glob.glob(os.path.join(save_path, final_name + ".*"))
+                mp3_path = matches[0] if matches else None
+
+            if mp3_path and os.path.exists(mp3_path):
+                self._log(f"\n[BPM] Scanning tempo...", "amber")
+                try:
+                    y, sr = librosa.load(mp3_path, sr=None, mono=True)
+                    tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+                    bpm = float(np.round(tempo[0] if hasattr(tempo, '__len__') else tempo))
+                    self._log(f"[BPM] >>> {bpm:.0f} BPM <<<", "cyan")
+                except Exception as e:
+                    self._log(f"[BPM] Could not detect: {e}", "amber")
 
             # Clear inputs for next download
             self.root.after(0, lambda: self.url_entry.delete(0, tk.END))
